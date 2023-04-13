@@ -22,7 +22,7 @@ Attributes:
 # Demo
 
 cfg = EasyDict()
-cfg.output_name = 'demo'
+cfg.output_name = 'fasterrcnn'
 cfg.path = r'C:\Datasets\PennFudanPed'
 cfg.batch_size = 4
 cfg.num_workers = 1
