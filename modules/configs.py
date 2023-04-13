@@ -19,8 +19,6 @@ Attributes:
     score_threshold (float): Score threshold.
 """
 
-# Demo
-
 cfg = EasyDict()
 cfg.output_name = 'fasterrcnn'
 cfg.path = r'C:\Datasets\PennFudanPed'
