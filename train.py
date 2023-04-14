@@ -68,7 +68,6 @@ def main():
 
         # Train
 
-        fasterrcnn.train()
         for j, (images, targets) in enumerate(trainloader):
             images = [image.to(cfg.device) for image in images]
             targets =  [{key: value.to(cfg.device) for key, value in target.items()} for target in targets]
