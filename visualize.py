@@ -20,7 +20,8 @@ def main():
     # Import configuration
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', help='configuration name in config.py', metavar='str', default='cfg')
+    parser.add_argument('-c', '--config', help='configuration name in config.py',
+                        metavar='str', default='cfg')
     args = parser.parse_args()
     configs = importlib.import_module('modules.configs')
     cfg = getattr(configs, args.config)
@@ -36,9 +37,8 @@ def main():
 
     dataset = PennFudanDataset(cfg.path)
     testset = Subset(dataset, range(len(dataset))[-50:])
-    testloader = DataLoader(testset, batch_size=1, shuffle=False,
-                            num_workers=cfg.num_workers, collate_fn=utils.collate_fn,
-                            pin_memory=cfg.pin_memory)
+    testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers,
+                            collate_fn=utils.collate_fn, pin_memory=cfg.pin_memory)
 
     # Load checkpoint
 
@@ -48,12 +48,12 @@ def main():
     fasterrcnn.to(cfg.device)
     checkpoint = torch.load(f'checkpoints/{pt}', map_location=cfg.device)
     fasterrcnn.load_state_dict(checkpoint['model'])
+    fasterrcnn.eval()
 
     # Start testing
 
     image_names = np.array(dataset.image_names)[range(len(dataset))[-50:]]
     preds = []
-    fasterrcnn.eval()
     with torch.no_grad():
         for (image, target), image_name in zip(testloader, image_names):
 

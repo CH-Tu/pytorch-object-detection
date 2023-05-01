@@ -20,7 +20,7 @@ def print_loss(iteration, total_iterations, loss, loss_name='loss'):
         loss (number): Loss value.
         loss_name (str): Loss name.
     """
-    string = f'{iteration}/{total_iterations} - {loss_name}: {loss:.4f}'
+    string = f'{iteration}/{total_iterations} - {loss_name}: {loss:.3f}'
     space = '                              '
     print(f'\r{space}', end='\r')
     if iteration != total_iterations:
@@ -28,26 +28,23 @@ def print_loss(iteration, total_iterations, loss, loss_name='loss'):
     else:
         print(string)
 
-def output_loss(output_name, train_loss_history, test_loss_history,
-                steps_per_epoch, epochs, loss_name='loss'):
-    """Output loss files and plots.
+def output_plot(output_name, history, xlabel='iteration', ylabel='', ylim=None):
+    """Output plot and values of the history.
 
     Args:
         output_name (str): Output name.
-        train_loss_history (numpy.ndarray): Training loss history.
-        test_loss_history (numpy.ndarray): Testing loss history.
-        steps_per_epoch (int): Steps per epoch.
-        epochs (int): Training epochs.
-        loss_name (str): Loss name.
+        history (numpy.ndarray): History.
+        xlabel (str): X-label of the plot.
+        ylabel (str): Y-label of the plot.
+        ylim (list): Y-limit of the plot. [bottom, top].
     """
-    np.savetxt(f'plots/{output_name}.{loss_name}.train.txt', train_loss_history)
-    np.savetxt(f'plots/{output_name}.{loss_name}.test.txt', test_loss_history)
-    plt.plot(train_loss_history)
-    plt.plot(np.linspace(steps_per_epoch, steps_per_epoch*epochs, num=epochs), test_loss_history)
-    plt.legend(['training loss', 'testing loss'])
-    plt.xlabel('iteration')
-    plt.ylabel(loss_name)
-    plt.savefig(f'plots/{output_name}.{loss_name}.png')
+    np.savetxt(f'plots/{output_name}.txt', history)
+    plt.plot(history)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if ylim is not None:
+        plt.ylim(ylim)
+    plt.savefig(f'plots/{output_name}.png')
     plt.close()
 
 def output_pred_image(image_path, image, output_dict, classes, colors, threshold=0.6):
@@ -63,5 +60,6 @@ def output_pred_image(image_path, image, output_dict, classes, colors, threshold
     """
     for box, label, score in zip(*output_dict.values()):
         if score > threshold:
-            image = draw_bounding_boxes(image, box.unsqueeze(0), labels=[classes[label-1]], colors=[colors[label-1]])
+            image = draw_bounding_boxes(image, box.unsqueeze(0), labels=[classes[label-1]],
+                                        colors=[colors[label-1]])
     Image.fromarray(image.permute(1, 2, 0).cpu().numpy()).save(image_path)

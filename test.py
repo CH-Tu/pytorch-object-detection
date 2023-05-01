@@ -20,7 +20,8 @@ def main():
     # Import configuration
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', help='configuration name in config.py', metavar='str', default='cfg')
+    parser.add_argument('-c', '--config', help='configuration name in config.py',
+                        metavar='str', default='cfg')
     args = parser.parse_args()
     configs = importlib.import_module('modules.configs')
     cfg = getattr(configs, args.config)
@@ -34,9 +35,8 @@ def main():
 
     dataset = PennFudanDataset(cfg.path)
     testset = Subset(dataset, range(len(dataset))[-50:])
-    testloader = DataLoader(testset, batch_size=1, shuffle=False,
-                            num_workers=cfg.num_workers, collate_fn=utils.collate_fn,
-                            pin_memory=cfg.pin_memory)
+    testloader = DataLoader(testset, batch_size=1, shuffle=False, num_workers=cfg.num_workers,
+                            collate_fn=utils.collate_fn, pin_memory=cfg.pin_memory)
 
     # Start testing
 
@@ -49,17 +49,18 @@ def main():
 
         fasterrcnn = fasterrcnn_resnet50_fpn_v2()
         in_features = fasterrcnn.roi_heads.box_predictor.cls_score.in_features
-        fasterrcnn.roi_heads.box_predictor = FastRCNNPredictor(in_features, dataset.get_num_classes())
+        fasterrcnn.roi_heads.box_predictor = FastRCNNPredictor(in_features,
+                                                               dataset.get_num_classes())
         fasterrcnn.to(cfg.device)
         pt = f'{cfg.output_name}.pt-{epoch+cfg.checkpoint_epochs}'
         checkpoint = torch.load(f'checkpoints/{pt}', map_location=cfg.device)
         fasterrcnn.load_state_dict(checkpoint['model'])
+        fasterrcnn.eval()
 
         # Test
 
         preds = []
         targets = []
-        fasterrcnn.eval()
         print(f'Start testing {pt}...')
         with torch.no_grad():
             for image, target in testloader:
@@ -85,7 +86,7 @@ def main():
         metric.update(preds, targets)
         maps = metric.compute()
         maps_list.append(maps)
-        print(f'mAP = {maps["map"]:.4f}')
+        print(f'mAP = {maps["map"]:.3f}')
 
     # Output json file
 
