@@ -1,34 +1,38 @@
 import os
-import numpy as np
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
-from torchvision import transforms
+from torchvision.io import read_image
+from torchvision.ops.boxes import masks_to_boxes
+from torchvision.transforms import v2
 
-class PennFudanDataset(Dataset):
+class PennFudan(Dataset):
     """PennFudan Dataset.
 
     Attributes:
         image_names (list): Image names.
         images (list): Images.
-        masks (list): Segmentation masks for each objects.
-        boxes (list): Bounding boxes for each objects in [x_min, y_min, x_max, y_max] format.
-        labels (list): Labels for each objects. There is only one class: pedestrian.
+        masks (list): The segmentation masks for each object.
+        boxes (list): The bounding boxes for each object in [x_min, y_min, x_max, y_max] format.
+        labels (list): The labels for each object. There is only one class: pedestrian.
     """
 
-    def __init__(self, path, transform=transforms.ToTensor()):
+    def __init__(self, root, train=True, transform=None):
         """
         Args:
-            path (str): Path of PennFudan dataset.
-            transform (torchvision.transforms): Transform for image.
+            root (str): The root directory of PennFudan dataset.
+            train (bool): If True, return training data; else, return testing data.
+            transform (torchvision.transforms): Image transformation. (not implemented)
         """
 
         # Get the paths of all images and masks
 
-        image_names = os.listdir(os.path.join(path, 'PNGImages'))
-        image_paths = [os.path.join(path, 'PNGImages', name) for name in image_names]
+        if train:
+            image_names = os.listdir(os.path.join(root, 'PNGImages'))[:-50]
+        else:
+            image_names = os.listdir(os.path.join(root, 'PNGImages'))[-50:]
+        image_paths = [os.path.join(root, 'PNGImages', name) for name in image_names]
         mask_names = [f'{os.path.splitext(name)[0]}_mask.png' for name in image_names]
-        mask_paths = [os.path.join(path, 'PedMasks', name) for name in mask_names]
+        mask_paths = [os.path.join(root, 'PedMasks', name) for name in mask_names]
         self.image_names = [os.path.splitext(name)[0] for name in image_names]
 
         # Load data
@@ -37,29 +41,27 @@ class PennFudanDataset(Dataset):
         self.masks = []
         self.boxes = []
         self.labels = []
+        to_float = v2.ToDtype(torch.float32, scale=True)
         for image_path, mask_path in zip(image_paths, mask_paths):
 
             # Load image
 
-            image = Image.open(image_path).convert('RGB')
-            image = transform(image)
+            image = read_image(image_path)
+            image = to_float(image)
             self.images.append(image)
 
             # Load mask
 
-            mask = np.array(Image.open(mask_path))
-            object_ids = np.unique(mask)
+            mask = read_image(mask_path)
+            object_ids = torch.unique(mask)
             object_ids = object_ids[1:]
-            masks = mask == object_ids[:, None, None] # (len(object_ids), height, width)
-            self.masks.append(torch.tensor(masks, dtype=torch.uint8))
+            masks = (mask == object_ids[:, None, None]).to(torch.uint8) # (len(object_ids), height, width)
+            self.masks.append(masks)
 
-            # Calculate bounding boxes
+            # Get bounding boxes
 
-            boxes = []
-            for mask in masks:
-                y, x = np.where(mask)
-                boxes.append([np.min(x), np.min(y), np.max(x), np.max(y)])
-            self.boxes.append(torch.tensor(boxes, dtype=torch.float32))
+            boxes = masks_to_boxes(masks)
+            self.boxes.append(boxes)
 
             # Generate labels
 
@@ -75,9 +77,9 @@ class PennFudanDataset(Dataset):
 
         Returns:
             image (torch.Tensor): An image.
-            target (dict): {'masks' (torch.Tensor): Segmentation masks for each objects,
-                            'boxes' (torch.Tensor): Bounding boxes for each objects,
-                            'labels' (torch.Tensor): Labels for each objects}.
+            target (dict): {'masks' (torch.Tensor): The segmentation masks for each object,
+                            'boxes' (torch.Tensor): The bounding boxes for each object,
+                            'labels' (torch.Tensor): The labels for each object}.
 
         Shape:
             image: (C, H, W).
