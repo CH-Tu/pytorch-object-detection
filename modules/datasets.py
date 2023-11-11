@@ -16,7 +16,7 @@ class PennFudan(Dataset):
         labels (list): The labels for each object. There is only one class: pedestrian.
     """
 
-    def __init__(self, root, train=True, transform=None):
+    def __init__(self, root, train=True, transform=v2.ToDtype(torch.float32, scale=True)):
         """
         Args:
             root (str): The root directory of PennFudan dataset.
@@ -41,13 +41,12 @@ class PennFudan(Dataset):
         self.masks = []
         self.boxes = []
         self.labels = []
-        to_float = v2.ToDtype(torch.float32, scale=True)
         for image_path, mask_path in zip(image_paths, mask_paths):
 
             # Load image
 
             image = read_image(image_path)
-            image = to_float(image)
+            image = transform(image)
             self.images.append(image)
 
             # Load mask

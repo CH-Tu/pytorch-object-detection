@@ -33,7 +33,7 @@ def main():
                         metavar='str', required=True)
     parser.add_argument('-n', '--name', help='the name for output files',
                         metavar='str', required=True)
-    parser.add_argument('-m', '--mask', help='use Mask R-CNN', action='store_true')
+    parser.add_argument('--mask', help='use Mask R-CNN', action='store_true')
     args = parser.parse_args()
     configs = importlib.import_module('modules.configs')
     cfg = getattr(configs, args.config)
@@ -59,7 +59,7 @@ def main():
     datasets = importlib.import_module('modules.datasets')
     Dataset = getattr(datasets, cfg.dataset)
     trainset = Dataset(**cfg.train_dataset_args)
-    trainloader = DataLoader(trainset, batch_size=cfg.batch_size, shuffle=True,
+    trainloader = DataLoader(trainset, batch_size=cfg.train_batch_size, shuffle=True,
                              num_workers=cfg.train_num_workers, collate_fn=utils.collate_fn,
                              pin_memory=cfg.pin_memory, drop_last=True)
 
@@ -76,8 +76,6 @@ def main():
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features_box, trainset.get_num_classes())
         model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer,
                                                            trainset.get_num_classes())
-        model.to(device)
-
     else:
 
         # Faster R-CNN
@@ -85,7 +83,7 @@ def main():
         model = fasterrcnn_resnet50_fpn_v2(weights=cfg.pretrained_weights)
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, trainset.get_num_classes())
-        model.to(device)
+    model.to(device)
 
     # Training settings
 
@@ -142,7 +140,7 @@ def main():
 
     # Save model
 
-    torch.save(model.state_dict(), os.path.join(root, f'{output_name}.model_dict.pt'))
+    torch.save(model.state_dict(), os.path.join(root, f'{output_name}.pt'))
 
     # Output plots
 
@@ -208,7 +206,7 @@ def main():
 
     # Save predictions
 
-    torch.save(preds, os.path.join(root, f'{output_name}.preds.pt'))
+    torch.save(preds, os.path.join(root_detection, 'preds.pt'))
 
     # Calculate mAPs
 
