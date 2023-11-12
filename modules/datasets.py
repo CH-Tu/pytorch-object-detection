@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.utils.data import Dataset
+from torchvision import tv_tensors
 from torchvision.io import read_image
 from torchvision.ops.boxes import masks_to_boxes
 from torchvision.transforms import v2
@@ -11,9 +12,10 @@ class PennFudan(Dataset):
     Attributes:
         image_names (list): Image names.
         images (list): Images.
-        masks (list): The segmentation masks for each object.
-        boxes (list): The bounding boxes for each object in [x_min, y_min, x_max, y_max] format.
-        labels (list): The labels for each object. There is only one class: pedestrian.
+        target (list): The dictionaries of ground truth.
+            {'boxes' (torchvision.tv_tensors.BoundingBoxes): The bounding boxes for each object in [x_min, y_min, x_max, y_max] format,
+             'labels' (torch.Tensor): The labels for each object. There is only one class: pedestrian,
+             'masks' (torchvision.tv_tensors.Mask): The segmentation masks for each object}
     """
 
     def __init__(self, root, train=True, transform=v2.ToDtype(torch.float32, scale=True)):
@@ -21,8 +23,9 @@ class PennFudan(Dataset):
         Args:
             root (str): The root directory of PennFudan dataset.
             train (bool): If True, return training data; else, return testing data.
-            transform (torchvision.transforms): Image transformation. (not implemented)
+            transform (torchvision.transforms.v2): Data transformation.
         """
+        self._transform = transform
 
         # Get the paths of all images and masks
 
@@ -38,16 +41,13 @@ class PennFudan(Dataset):
         # Load data
 
         self.images = []
-        self.masks = []
-        self.boxes = []
-        self.labels = []
+        self.targets = []
         for image_path, mask_path in zip(image_paths, mask_paths):
 
             # Load image
 
             image = read_image(image_path)
-            image = transform(image)
-            self.images.append(image)
+            image = tv_tensors.Image(image)
 
             # Load mask
 
@@ -55,16 +55,22 @@ class PennFudan(Dataset):
             object_ids = torch.unique(mask)
             object_ids = object_ids[1:]
             masks = (mask == object_ids[:, None, None]).to(torch.uint8) # (len(object_ids), height, width)
-            self.masks.append(masks)
+            masks = tv_tensors.Mask(masks)
 
             # Get bounding boxes
 
             boxes = masks_to_boxes(masks)
-            self.boxes.append(boxes)
+            boxes = tv_tensors.BoundingBoxes(boxes, format='XYXY', canvas_size=image.shape[-2:])
 
             # Generate labels
 
-            self.labels.append(torch.ones(len(object_ids), dtype=torch.int64))
+            labels = torch.ones(len(object_ids), dtype=torch.int64)
+
+            # Append data
+
+            target = {'boxes': boxes, 'labels': labels, 'masks': masks}
+            self.images.append(image)
+            self.targets.append(target)
 
     def __len__(self):
         return len(self.images)
@@ -75,19 +81,18 @@ class PennFudan(Dataset):
             idx (int): Input index.
 
         Returns:
-            image (torch.Tensor): An image.
-            target (dict): {'masks' (torch.Tensor): The segmentation masks for each object,
-                            'boxes' (torch.Tensor): The bounding boxes for each object,
-                            'labels' (torch.Tensor): The labels for each object}.
+            image (torchvision.tv_tensors.Image): An image.
+            target (dict): {'boxes' (torchvision.tv_tensors.BoundingBoxes): The bounding boxes for each object,
+                            'labels' (torch.Tensor): The labels for each object,
+                            'masks' (torchvision.tv_tensors.Mask): The segmentation masks for each object}.
 
         Shape:
             image: (C, H, W).
-            target: {'masks': (N, H, W),
-                     'boxes': (N, 4),
-                     'labels': (N)}.
+            target: {'boxes': (N, 4),
+                     'labels': (N),
+                     'masks': (N, H, W)}.
         """
-        image = self.images[idx]
-        target = {'masks': self.masks[idx], 'boxes': self.boxes[idx], 'labels': self.labels[idx]}
+        image, target = self._transform(self.images[idx], self.targets[idx])
         return image, target
 
     def get_num_classes(self):

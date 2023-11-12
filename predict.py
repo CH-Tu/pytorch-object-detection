@@ -18,11 +18,10 @@ class Images(Dataset):
         images (list): Images.
     """
 
-    def __init__(self, root, transform=v2.ToDtype(torch.float32, scale=True)):
+    def __init__(self, root):
         """
         Args:
-            root (str): Image directory.
-            transform (torchvision.transforms): Image transformation.
+            root (str): The directory of images.
         """
 
         # Get the paths of all images
@@ -33,10 +32,11 @@ class Images(Dataset):
 
         # Load images
 
+        to_float = v2.ToDtype(torch.float32, scale=True)
         self.images = []
         for image_path in image_paths:
             image = read_image(image_path)
-            image = transform(image)
+            image = to_float(image)
             self.images.append(image)
 
     def __len__(self):

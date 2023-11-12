@@ -7,7 +7,7 @@ from torchvision.transforms import v2
 Attributes:
     dataset (str): The class name of the dataset in datasets.py.
     root (str): The root directory of the dataset.
-    transforms (torchvision.transforms): Image transformation. (not implemented)
+    transforms (torchvision.transforms.v2): Training data transformation.
     batch_size (int): Batch size.
     num_workers (int): How many subprocesses to use for data loading.
     pin_memory (bool): If True, the data loader will copy Tensors into CUDA pinned memory before returning them.
@@ -26,7 +26,7 @@ Attributes:
 cfg = EasyDict()
 cfg.dataset = 'PennFudan'
 cfg.root = r'C:\Datasets\PennFudanPed'
-# cfg.transforms = 
+cfg.transforms = v2.ToDtype(torch.float32, scale=True)
 cfg.train_batch_size = 4
 cfg.pred_batch_size = 4
 cfg.train_num_workers = 1
@@ -43,7 +43,8 @@ cfg.colors = ['white']
 
 cfg.train_dataset_args = {
     'root': cfg.root,
-    'train': True
+    'train': True,
+    'transform': cfg.transforms
 }
 cfg.test_dataset_args = {
     'root': cfg.root,

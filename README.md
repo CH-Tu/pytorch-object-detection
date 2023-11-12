@@ -16,7 +16,7 @@ pycocotools
 ```
 dataset             the class name of the dataset in datasets.py
 root                the root directory of the dataset
-transforms          image transformation (not implemented)
+transforms          training data transformation
 batch_size          batch size
 num_workers         how many subprocesses to use for data loading
 pin_memory          if True, the data loader will copy Tensors into CUDA pinned memory before returning them
