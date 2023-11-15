@@ -32,14 +32,20 @@ train_dataset_args  the arguments of training dataset
 test_dataset_args   the arguments of testing dataset
 ```
 
-## Train and Test
+## Train
 ```shell
-python run.py --config cfg --name fasterrcnn      # Faster R-CNN
-python run.py --config cfg --name maskrcnn --mask # Mask R-CNN
+python train.py --config penn_fudan --name fasterrcnn      # Faster R-CNN
+python train.py --config penn_fudan --name maskrcnn --mask # Mask R-CNN
+```
+
+## Test
+```shell
+python test.py --config penn_fudan --model results\fasterrcnn\fasterrcnn.pt    # Faster R-CNN
+python test.py --config penn_fudan --model results\maskrcnn\maskrcnn.pt --mask # Mask R-CNN
 ```
 
 ## Predict
 ```shell
-python predict.py --config cfg --name images_fasterrcnn --model results\fasterrcnn\fasterrcnn.pt --path tutorial\images  # Faster R-CNN
-python predict.py --config cfg --name images_maskrcnn --model results\maskrcnn\maskrcnn.pt --path tutorial\images --mask # Mask R-CNN
+python predict.py --config penn_fudan --name images_fasterrcnn --model results\fasterrcnn\fasterrcnn.pt --path docs\images  # Faster R-CNN
+python predict.py --config penn_fudan --name images_maskrcnn --model results\maskrcnn\maskrcnn.pt --path docs\images --mask # Mask R-CNN
 ```

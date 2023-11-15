@@ -23,30 +23,32 @@ Attributes:
     test_dataset_args (dict): The arguments of testing dataset.
 """
 
-cfg = EasyDict()
-cfg.dataset = 'PennFudan'
-cfg.root = r'C:\Datasets\PennFudanPed'
-cfg.transforms = v2.ToDtype(torch.float32, scale=True)
-cfg.train_batch_size = 4
-cfg.pred_batch_size = 4
-cfg.train_num_workers = 1
-cfg.test_num_workers = 1
-cfg.pred_num_workers = 1
-cfg.pin_memory = True
-cfg.pretrained_weights = 'DEFAULT'
-cfg.lr = 1e-4
-cfg.epochs = 20
-cfg.mask_threshold = 0.5
-cfg.score_threshold = 0.6
-cfg.classes = ['pedestrian']
-cfg.colors = ['white']
+penn_fudan = EasyDict()
+penn_fudan.dataset = 'PennFudan'
+penn_fudan.root = r'C:\Datasets\PennFudanPed'
+penn_fudan.transforms = v2.Compose([
+    v2.ToDtype(torch.float32, scale=True)
+])
+penn_fudan.train_batch_size = 4
+penn_fudan.pred_batch_size = 4
+penn_fudan.train_num_workers = 1
+penn_fudan.test_num_workers = 1
+penn_fudan.pred_num_workers = 1
+penn_fudan.pin_memory = True
+penn_fudan.pretrained_weights = 'DEFAULT'
+penn_fudan.lr = 1e-4
+penn_fudan.epochs = 20
+penn_fudan.mask_threshold = 0.5
+penn_fudan.score_threshold = 0.6
+penn_fudan.classes = ['pedestrian']
+penn_fudan.colors = ['white']
 
-cfg.train_dataset_args = {
-    'root': cfg.root,
+penn_fudan.train_dataset_args = {
+    'root': penn_fudan.root,
     'train': True,
-    'transform': cfg.transforms
+    'transform': penn_fudan.transforms
 }
-cfg.test_dataset_args = {
-    'root': cfg.root,
+penn_fudan.test_dataset_args = {
+    'root': penn_fudan.root,
     'train': False
 }

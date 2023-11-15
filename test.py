@@ -1,12 +1,8 @@
 import argparse
 import importlib
 import os
-import time
-import datetime
 import json
-import numpy as np
 import torch
-from torch import optim
 from torch.utils.data import DataLoader
 from torchvision.io import write_jpeg
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
@@ -22,7 +18,7 @@ def main():
     """
     Args:
         config (str): The configuration name in config.py.
-        name (str): The name for output files.
+        model (str): Model pt file.
         mask: Use Mask R-CNN.
     """
 
@@ -31,13 +27,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='the configuration name in config.py',
                         metavar='str', required=True)
-    parser.add_argument('-n', '--name', help='the name for output files',
+    parser.add_argument('-m', '--model', help='model pt file',
                         metavar='str', required=True)
     parser.add_argument('--mask', help='use Mask R-CNN', action='store_true')
     args = parser.parse_args()
     configs = importlib.import_module('modules.configs')
     cfg = getattr(configs, args.config)
-    output_name = args.name
+    output_name = os.path.splitext(os.path.basename(args.model))[0]
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create directories
@@ -53,112 +49,40 @@ def main():
     if not os.path.isdir(root_detection):
         os.mkdir(root_detection)
 
-    # Load training data
-
-    print('Load training data...')
-    datasets = importlib.import_module('modules.datasets')
-    Dataset = getattr(datasets, cfg.dataset)
-    trainset = Dataset(**cfg.train_dataset_args)
-    trainloader = DataLoader(trainset, batch_size=cfg.train_batch_size, shuffle=True,
-                             num_workers=cfg.train_num_workers, collate_fn=utils.collate_fn,
-                             pin_memory=cfg.pin_memory, drop_last=True)
-
-    # Load model
-
-    if args.mask:
-
-        # Mask R-CNN
-
-        model = maskrcnn_resnet50_fpn_v2(weights=cfg.pretrained_weights)
-        in_features_box = model.roi_heads.box_predictor.cls_score.in_features
-        in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
-        hidden_layer = model.roi_heads.mask_predictor.conv5_mask.out_channels
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features_box, trainset.get_num_classes())
-        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer,
-                                                           trainset.get_num_classes())
-    else:
-
-        # Faster R-CNN
-
-        model = fasterrcnn_resnet50_fpn_v2(weights=cfg.pretrained_weights)
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, trainset.get_num_classes())
-    model.to(device)
-
-    # Training settings
-
-    optimizer = optim.Adam(model.parameters(), lr=cfg.lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(trainloader)*cfg.epochs)
-    metric = MeanAveragePrecision(iou_type='segm' if args.mask else 'bbox')
-
-    # Start training
-
-    loss_history = []
-    map_history = []
-    train_start = time.time()
-    print(f'Start training {output_name}...')
-    for i in range(cfg.epochs):
-        print(f'Epoch {i+1}/{cfg.epochs}')
-        for j, (images, targets) in enumerate(trainloader):
-            images = [image.to(device) for image in images]
-            targets =  [{key: value.to(device) for key, value in target.items()} for target in targets]
-
-            # Train
-
-            model.train()
-            optimizer.zero_grad()
-            loss_dict = model(images, targets)
-            loss = sum(loss_dict.values())
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-
-            # Calculate mAP
-
-            model.eval()
-            with torch.no_grad():
-                preds = model(images)
-                if args.mask:
-                    preds = [{key: (value > cfg.mask_threshold).squeeze(1) if key == 'masks' else value
-                             for key, value in pred.items()} for pred in preds]
-                metric.update(preds, targets)
-                maps = metric.compute()
-                metric.reset()
-
-            # Record loss and mAP
-
-            loss_history.append([value.item() for value in loss_dict.values()])
-            map_history.append(maps['map'].item())
-            utils.print_loss_and_map(j+1, len(trainloader), loss, maps['map'])
-    train_end = time.time()
-
-    # Record training time
-
-    train_time = train_end - train_start
-    with open(os.path.join(root, f'{output_name}.train_time.txt'), 'w') as f:
-        f.write(str(datetime.timedelta(seconds=train_time)))
-
-    # Save model
-
-    torch.save(model.state_dict(), os.path.join(root, f'{output_name}.pt'))
-
-    # Output plots
-
-    utils.output_plot(os.path.join(root, f'{output_name}.loss'), np.sum(loss_history, axis=1),
-                      ylabel='Loss', linewidth=0.5)
-    utils.output_plot(os.path.join(root, f'{output_name}.map'), map_history,
-                      ylabel='mAP', ylim=[0, 1.05], linewidth=0.5)
-    for i, loss_name in enumerate(loss_dict.keys()):
-        utils.output_plot(os.path.join(root, f'{output_name}.{loss_name}'), np.array(loss_history)[:, i],
-                          ylabel=loss_name, linewidth=0.5)
-
     # Load testing data
 
     print('Load testing data...')
+    datasets = importlib.import_module('modules.datasets')
+    Dataset = getattr(datasets, cfg.dataset)
     testset = Dataset(**cfg.test_dataset_args)
     testloader = DataLoader(testset, batch_size=1, shuffle=False,
                             num_workers=cfg.test_num_workers, collate_fn=utils.collate_fn,
                             pin_memory=cfg.pin_memory)
+
+    # Load model
+
+    model_state_dict = torch.load(args.model, map_location=device)
+    if args.mask:
+
+        # Mask R-CNN
+
+        model = maskrcnn_resnet50_fpn_v2()
+        in_features_box = model.roi_heads.box_predictor.cls_score.in_features
+        in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+        hidden_layer = model.roi_heads.mask_predictor.conv5_mask.out_channels
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features_box, testset.get_num_classes())
+        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer,
+                                                           testset.get_num_classes())
+    else:
+
+        # Faster R-CNN
+
+        model = fasterrcnn_resnet50_fpn_v2()
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, testset.get_num_classes())
+    model.to(device)
+    model.load_state_dict(model_state_dict)
+    model.eval()
 
     # Start testing
 
@@ -166,6 +90,7 @@ def main():
     targets = []
     total_inference_time = 0
     to_uint8 = v2.ToDtype(torch.uint8, scale=True)
+    metric = MeanAveragePrecision(iou_type='segm' if args.mask else 'bbox')
     print(f'Start testing {output_name}...')
     with torch.no_grad():
         for (image, target), image_name in zip(testloader, testset.image_names):
